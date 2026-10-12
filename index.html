@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pendapatan Harian</title>
+<style>
+  :root { --bg:#f2f5f4; --card:#ffffff; --ink:#14302b; --muted:#5d7571; --line:#d5dfdc; --accent:#0b6e63; --danger:#b3261e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1b19; --card:#172623; --ink:#e6f0ee; --muted:#93aaa6; --line:#2a3f3b; --accent:#3cc4b2; --danger:#ff8a80; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:Georgia,"Times New Roman",serif; line-height:1.5; }
+  main { max-width:560px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:1.6rem; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; font-family:system-ui,sans-serif; font-size:.95rem; }
+  .total { background:var(--accent); color:#fff; border-radius:14px; padding:20px; margin-bottom:20px; }
+  @media (prefers-color-scheme: dark) { .total { color:#0f1b19; } }
+  .total small { display:block; font-family:system-ui,sans-serif; opacity:.85; }
+  .total strong { font-size:2.2rem; display:block; margin-top:4px; }
+  .box { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:20px; }
+  label { display:block; font-family:system-ui,sans-serif; font-size:.9rem; color:var(--muted); margin:10px 0 4px; }
+  input { width:100%; padding:10px; font-size:1rem; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); }
+  input:focus, button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  button.add { margin-top:14px; width:100%; padding:12px; font-size:1rem; border:0; border-radius:6px; background:var(--accent); color:#fff; cursor:pointer; }
+  @media (prefers-color-scheme: dark) { button.add { color:#0f1b19; } }
+  h2 { font-size:1.1rem; margin:0 0 10px; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid var(--line); font-family:system-ui,sans-serif; }
+  .row:last-child { border-bottom:0; }
+  .row .date { color:var(--muted); font-size:.85rem; }
+  .row .amt { font-weight:600; }
+  .row .note { font-size:.85rem; color:var(--muted); }
+  .del { background:none; border:0; color:var(--danger); cursor:pointer; font-size:.85rem; padding:4px 6px; }
+  .empty { color:var(--muted); font-family:system-ui,sans-serif; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pendapatan harian</h1>
+  <p class="sub">Catat uang masuk tiap hari, lihat totalnya.</p>
+
+  <div class="total">
+    <small id="hariLabel">Hari ini</small>
+    <strong id="totalHari">Rp 0</strong>
+    <small id="totalSemua" style="margin-top:8px">Total semua hari: Rp 0</small>
+  </div>
+
+  <div class="box">
+    <label for="tgl">Tanggal</label>
+    <input type="date" id="tgl">
+    <label for="jumlah">Jumlah pendapatan (Rp)</label>
+    <input type="number" id="jumlah" inputmode="numeric" min="0" placeholder="contoh: 500000">
+    <label for="ket">Catatan (boleh kosong)</label>
+    <input type="text" id="ket" placeholder="contoh: gadai emas">
+    <button class="add" id="simpan">Simpan pendapatan</button>
+  </div>
+
+  <div class="box">
+    <h2>Rekap per hari</h2>
+    <div id="daftar"></div>
+  </div>
+</main>
+
+<script>
+  var KEY = "pendapatan-harian";
+  var data = [];
+  try { data = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { data = []; }
+
+  function simpanData() {
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+  }
+  function rupiah(n) { return "Rp " + Number(n).toLocaleString("id-ID"); }
+  function hariIni() {
+    var d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  }
+  function formatTanggal(s) {
+    return new Date(s + "T00:00:00").toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  }
+
+  function tampil() {
+    var today = hariIni();
+    var perHari = {};
+    var semua = 0;
+    data.forEach(function (x) {
+      perHari[x.tgl] = (perHari[x.tgl] || 0) + x.jumlah;
+      semua += x.jumlah;
+    });
+    document.getElementById("totalHari").textContent = rupiah(perHari[today] || 0);
+    document.getElementById("totalSemua").textContent = "Total semua hari: " + rupiah(semua);
+
+    var box = document.getElementById("daftar");
+    box.innerHTML = "";
+    var tanggal = Object.keys(perHari).sort().reverse();
+    if (!tanggal.length) {
+      box.innerHTML = '<p class="empty">Belum ada catatan. Isi formulir di atas untuk mulai.</p>';
+      return;
+    }
+    tanggal.forEach(function (t) {
+      var head = document.createElement("div");
+      head.className = "row";
+      head.innerHTML = '<div><div class="date"></div></div><div class="amt"></div>';
+      head.querySelector(".date").textContent = formatTanggal(t);
+      head.querySelector(".amt").textContent = rupiah(perHari[t]);
+      box.appendChild(head);
+      data.forEach(function (x, i) {
+        if (x.tgl !== t) return;
+        var r = document.createElement("div");
+        r.className = "row";
+        r.innerHTML = '<div class="note"></div><div><span class="note"></span> <button class="del">Hapus</button></div>';
+        r.children[0].textContent = x.ket || "(tanpa catatan)";
+        r.querySelector("span").textContent = rupiah(x.jumlah);
+        r.querySelector(".del").addEventListener("click", function () {
+          data.splice(i, 1); simpanData(); tampil();
+        });
+        box.appendChild(r);
+      });
+    });
+  }
+
+  document.getElementById("tgl").value = hariIni();
+  document.getElementById("simpan").addEventListener("click", function () {
+    var tgl = document.getElementById("tgl").value;
+    var jumlah = parseInt(document.getElementById("jumlah").value, 10);
+    var ket = document.getElementById("ket").value.trim();
+    if (!tgl || isNaN(jumlah) || jumlah < 0) { alert("Isi tanggal dan jumlah dulu."); return; }
+    data.push({ tgl: tgl, jumlah: jumlah, ket: ket });
+    simpanData();
+    document.getElementById("jumlah").value = "";
+    document.getElementById("ket").value = "";
+    tampil();
+  });
+  tampil();
+</script>
+</body>
+</html>
